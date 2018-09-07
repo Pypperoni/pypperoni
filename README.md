@@ -15,7 +15,7 @@ Pypperoni's main objective is to eliminate the interpreter by preprocessing your
 
 ## Getting Started
 ### Downloading Sample Projects
-To best get a feel of how Pypperoni works, try downloading one of our many [sample projects](http://github.com/pypperoni/sample-projects). To get started, please follow each project's included guide on how to set them up. These samples are a good example of how to properly structure your own Pypperoni project.
+To best get a feel of how Pypperoni works, try downloading one of our many [sample projects](http://github.com/pypperoni/samples). To get started, please follow each project's included guide on how to set them up. These samples are a good example of how to properly structure your own Pypperoni project.
 
 
 ## Why use Pypperoni?
