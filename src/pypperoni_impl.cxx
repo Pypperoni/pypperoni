@@ -479,10 +479,38 @@ static PyMemberDef func_memberlist[] = {
     {NULL}      /* Sentinel */
 };
 
+static int func_set_dict(PypperoniFunctionObject* op, PyObject* dict)
+{
+    if (!dict || !PyDict_Check(dict))
+    {
+        PyErr_SetString(PyExc_TypeError, "expected a dict");
+        return -1;
+    }
+
+    Py_DECREF(op->func_dict);
+    op->func_dict = dict;
+    Py_INCREF(op->func_dict);
+    return 0;
+}
+
 static PyObject* func_get_dict(PypperoniFunctionObject* op)
 {
     Py_INCREF(op->func_dict);
     return op->func_dict;
+}
+
+static int func_set_name(PypperoniFunctionObject* op, PyObject* name)
+{
+    if (!name || !PyString_Check(name))
+    {
+        PyErr_SetString(PyExc_TypeError, "expected a string");
+        return -1;
+    }
+
+    Py_DECREF(op->func_name);
+    op->func_name = name;
+    Py_INCREF(op->func_name);
+    return 0;
 }
 
 static PyObject* func_get_name(PypperoniFunctionObject* op)
@@ -491,9 +519,20 @@ static PyObject* func_get_name(PypperoniFunctionObject* op)
     return op->func_name;
 }
 
+static int func_set_module(PypperoniFunctionObject*, PyObject*)
+{
+    return 0;
+}
+
+static PyObject* func_get_module(PypperoniFunctionObject*)
+{
+    return Py_BuildValue("s", "PypperoniFunction");
+}
+
 static PyGetSetDef func_getsetlist[] = {
-    {"__dict__", (getter)func_get_dict, 0},
-    {"__name__", (getter)func_get_name, 0},
+    {"__dict__", (getter)func_get_dict, (setter)func_set_dict},
+    {"__name__", (getter)func_get_name, (setter)func_set_name},
+    {"__module__", (getter)func_get_module, (setter)func_set_module},
     {NULL} /* Sentinel */
 };
 
