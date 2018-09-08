@@ -43,6 +43,8 @@ class CMakeFileGenerator:
         self.cmake_in_file = os.path.join(PYPPERONI_ROOT, 'pypperoni', 'cmake.in')
         self.add_directory(os.path.join(PYPPERONI_ROOT, 'python', 'Lib'))
 
+        self.generate_codecs_index()
+
     def add_file(self, filename, name=None):
         '''
         Adds a single file to modules.
@@ -57,6 +59,9 @@ class CMakeFileGenerator:
             if name.endswith('.__init__'):
                 name = name[:-9]
 
+        self.add_module(name, data)
+
+    def add_module(self, name, data):
         code = compile(data, name, 'exec')
         self.modules[name] = Module(name, code)
 
@@ -105,6 +110,16 @@ class CMakeFileGenerator:
 
         finally:
             os.chdir(cwd)
+
+    def generate_codecs_index(self):
+        data = 'from encodings import register_mod\n'
+        for k in self.modules:
+            if k.startswith('encodings.'):
+                name = k[10:]
+                data += 'from encodings import %s\n' % name
+                data += 'register_mod(%s)\n' % name
+
+        self.add_module('codecs_index', data)
 
     @staticmethod
     def hash_file(f):
