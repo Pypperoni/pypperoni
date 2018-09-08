@@ -1020,7 +1020,7 @@ PyObject* __pypperoni_IMPL_load_global(PypperoniFrame* f, PyObject* name)
         x = PyDict_GetItem(f->f_builtins, name);
         if (x == NULL) {
           load_global_error:
-            PyErr_Format(PyExc_NameError, "name '%.200s' is not defined", name);
+            PyErr_Format(PyExc_NameError, "name '%.200s' is not defined", PyString_AS_STRING(name));
             x = NULL;
         }
     }
