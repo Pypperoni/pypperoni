@@ -538,7 +538,7 @@ static PyGetSetDef func_getsetlist[] = {
 
 static PyObject* func_call(PypperoniFunctionObject* func, PyObject* args, PyObject* kw)
 {
-    Py_ssize_t i, num_given, kwidx;
+    Py_ssize_t i, num_given, kwidx, num_cellvars;
     PyObject** co_varnames;
     PyObject* result = NULL;
 
@@ -669,21 +669,8 @@ static PyObject* func_call(PypperoniFunctionObject* func, PyObject* args, PyObje
     }
 
     // Closures:
-    for (i = 0; i < PyTuple_GET_SIZE(func->func_closure); ++i)
-    {
-        PyObject* o = PyTuple_GET_ITEM(func->func_closure, i);
-        Py_INCREF(o);
-        Py_DECREF(f->f_cells[i]);
-        f->f_cells[i] = o;
-
-        if (PyCell_Get(o) == NULL)
-        {
-            PyErr_Format(PyExc_RuntimeError, "cell %d of %s should not be empty!", i, PyString_AsString(func->func_name));
-            goto fail;
-        }
-    }
-
-    for (i = 0; i < PyList_GET_SIZE(func->func_cellvars); ++i)
+    num_cellvars = PyList_GET_SIZE(func->func_cellvars);
+    for (i = 0; i < num_cellvars; ++i)
     {
         if (PyCell_Get(f->f_cells[i]) != NULL)
             continue;
@@ -701,6 +688,20 @@ static PyObject* func_call(PypperoniFunctionObject* func, PyObject* args, PyObje
         }
 
         found: continue;
+    }
+
+    for (i = 0; i < PyTuple_GET_SIZE(func->func_closure); ++i)
+    {
+        PyObject* o = PyTuple_GET_ITEM(func->func_closure, i);
+        Py_INCREF(o);
+        Py_DECREF(f->f_cells[i + num_cellvars]);
+        f->f_cells[i + num_cellvars] = o;
+
+        if (PyCell_Get(o) == NULL)
+        {
+            PyErr_Format(PyExc_RuntimeError, "cell %d of %s should not be empty!", i + num_cellvars, PyString_AsString(func->func_name));
+            goto fail;
+        }
     }
 
     if (func->func_flags & CO_GENERATOR)
