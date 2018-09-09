@@ -1210,14 +1210,60 @@ class Module(ModuleBase):
 
         if not fromlist:
             # Case 1: Import and store
-            context.insert_line('x = __pypperoni_IMPL_import((Py_ssize_t)%dU); /* %s */' % (mod.get_id(), mod.name))
-            context.insert_line('if (x == NULL) {')
-            context.insert_handle_error(line, label)
-            context.insert_line('}')
-            context.insert_line('PUSH(x);')
+            import_handled = False
+            if import_name == orig_name and '.' in orig_name:
+                module, tail_list = import_name.split('.', 1)
+                if module in context.modules:
+                    # Special case: "import <module>.<submodule>" (eg. "import os.path")
+                    # First, import <module>, which is what actually gets stored (x)
+                    # unless this is "imported as" (ie. "import module.submodule as M")
+                    # In that case, the import will be followed by LOAD_ATTR
+                    store_tail = False
+                    while context.buf[context.i][1] == LOAD_ATTR:
+                        store_tail = True
+                        context.i += 1
 
-            while context.buf[context.i][0] == LOAD_ATTR:
-                context.i += 1
+                    tail_list = tail_list.split('.')
+
+                    rootmod = context.modules[module]
+                    context.insert_line('w = x = __pypperoni_IMPL_import((Py_ssize_t)%dU); /* %s */' % (rootmod.get_id(), rootmod.name))
+                    context.insert_line('Py_INCREF(x);')
+                    context.insert_line('if (x == NULL) {')
+                    context.insert_handle_error(line, label)
+                    context.insert_line('}')
+
+                    modname = module + '.'
+                    while tail_list:
+                        # Now import <tail> and setattr
+                        tail = tail_list.pop(0)
+                        modname += tail + '.'
+                        mod = context.modules[modname[:-1]]
+                        context.insert_line('u = __pypperoni_IMPL_import((Py_ssize_t)%dU); /* %s */' % (mod.get_id(), modname[:-1]))
+                        context.insert_line('if (u == NULL) {')
+                        context.insert_line('Py_DECREF(x);')
+                        context.insert_line('Py_DECREF(w);')
+                        context.insert_handle_error(line, label)
+                        context.insert_line('}')
+                        context.insert_line('PyObject_SetAttr(x, %s, u);' % context.register_const(tail))
+                        context.insert_line('Py_DECREF(x);')
+                        context.insert_line('x = u;')
+
+                    if store_tail:
+                        context.insert_line('Py_DECREF(w);')
+
+                    else:
+                        context.insert_line('Py_DECREF(x);')
+                        context.insert_line('x = w;')
+
+                    import_handled = True
+
+            if not import_handled:
+                context.insert_line('x = __pypperoni_IMPL_import((Py_ssize_t)%dU); /* %s */' % (mod.get_id(), mod.name))
+                context.insert_line('if (x == NULL) {')
+                context.insert_handle_error(line, label)
+                context.insert_line('}')
+
+            context.insert_line('PUSH(x);')
 
             # Let __handle_one_instr handle STORE_*
 
