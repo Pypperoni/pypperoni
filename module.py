@@ -210,6 +210,10 @@ class Module(ModuleBase):
         elif op == LOAD_FAST:
             context.begin_block()
             context.insert_line('x = f->f_fastlocals[%d];' % oparg)
+            context.insert_line('if (x == NULL) {')
+            context.insert_line('__pypperoni_IMPL_raise(PyExc_UnboundLocalError, "failed to load local %d");' % oparg)
+            context.insert_handle_error(line, label)
+            context.insert_line('}')
             context.insert_line('Py_INCREF(x);')
             context.insert_line('PUSH(x);')
             context.end_block()
