@@ -79,13 +79,14 @@ class Module(ModuleBase):
             context.insert_line('Py_XDECREF(tb);')
             context.insert_line('PyErr_Fetch(&exc, &val, &tb);')
             context.insert_line('PyErr_NormalizeException(&exc, &val, &tb);')
+            context.insert_line('if (exc == NULL) {exc = Py_None; Py_INCREF(exc);}')
             context.insert_line('if (val == NULL) {val = Py_None; Py_INCREF(val);}')
             context.insert_line('if (tb == NULL) {Py_INCREF(Py_None); PUSH(Py_None);}')
             context.insert_line('else {PUSH(tb);}')
             context.insert_line('PUSH(val);')
             context.insert_line('PUSH(exc);')
-            context.insert_line('Py_XINCREF(exc);')
-            context.insert_line('Py_XINCREF(val);')
+            context.insert_line('Py_INCREF(exc);')
+            context.insert_line('Py_INCREF(val);')
             context.insert_line('Py_XINCREF(tb);')
 
         if label in context.loop_blocks:
