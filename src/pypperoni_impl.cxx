@@ -2117,6 +2117,8 @@ void setup_pypperoni()
     ));
 }
 
+static PyMethodDef def;
+
 int __pypperoni_IMPL_main()
 {
     if (PyType_Ready(&PypperoniFunc_Type) < 0)
@@ -2126,7 +2128,6 @@ int __pypperoni_IMPL_main()
         return -2;
 
     PyObject* m = Py_ImportBuiltin("__pypperoni__");
-    PyMethodDef def;
     def.ml_name = "describeException";
     def.ml_meth = (PyCFunction)Py_PypperoniTraceback_Format;
     def.ml_flags = METH_NOARGS;
