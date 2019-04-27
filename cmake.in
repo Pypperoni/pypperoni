@@ -1,0 +1,55 @@
+cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+project($$project$$)
+
+find_package(OpenSSL REQUIRED)
+if(NOT OPENSSL_FOUND)
+    message(FATAL_ERROR "You need OpenSSL to build this.")
+endif()
+
+find_package(ZLIB REQUIRED)
+if(NOT ZLIB_FOUND)
+    message(FATAL_ERROR "You need ZLIB to build this.")
+endif()
+
+include_directories(${OPENSSL_INCLUDE_DIR})
+include_directories(${ZLIB_INCLUDE_DIRS})
+
+if(WIN32)
+    add_definitions(-DWIN32)
+    add_definitions(-D_WIN32)
+    add_definitions(-D_USRDLL)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
+endif()
+
+if (MSVC)
+    add_definitions(/wd4102)
+endif()
+
+if (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "GNU")
+    set(CMAKE_C_FLAGS "-g")
+endif()
+
+add_definitions(-DNDEBUG)
+add_definitions(-DPy_BUILD_CORE)
+
+include_directories(gen)
+include_directories($$python_root$$/Include)
+include_directories($$pypperoni_root$$/src)
+
+link_directories($$python_root$$/build)
+
+set(_FILES
+    $$pypperoni_root$$/src/pypperoni_impl.c
+    $$pypperoni_root$$/src/main.c
+$$files$$)
+
+add_executable($$project$$ ${_FILES})
+target_link_libraries($$project$$ python3.6 ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
+if (WIN32)
+    target_link_libraries($$project$$ ws2_32 crypt32)
+else()
+    target_link_libraries($$project$$ pthread m util)
+endif()
