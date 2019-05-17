@@ -27,6 +27,7 @@ import hashlib
 import struct
 import types
 import dis
+import ast
 
 
 IDX_LABEL = 0
@@ -42,10 +43,14 @@ FVC_ASCII = 0x3
 FVS_MASK = 0x4
 FVS_HAVE_SPEC = 0x4
 
+
 class ModuleBase:
+    '''
+    Base class for all module types.
+    '''
     def __init__(self, name, code):
         self.name = name
-        self.code = CodeObject(code)
+        self.astmod = ast.parse(code)
 
         self._is_main = False
         self._id = -1
@@ -54,6 +59,9 @@ class ModuleBase:
         self._is_main = True
 
     def is_external(self):
+        return False
+
+    def is_package(self):
         return False
 
     def get_id(self):
@@ -73,6 +81,9 @@ class ModuleBase:
 
 
 class Module(ModuleBase):
+    '''
+    The simplest module class.
+    '''
     def __init__(self, name, code):
         ModuleBase.__init__(self, name, code)
 
@@ -964,7 +975,8 @@ class Module(ModuleBase):
             context.insert_line('Py_DECREF(u);')
             context.insert_handle_error(line, label)
             context.insert_line('}')
-            context.insert_line('func = (PyFunctionObject*) PyFunction_NewWithQualName((PyObject*)codeobj, f->f_globals, u);')
+            context.insert_line('func = (PyFunctionObject*) PyFunction_NewWithQualName'
+                                '((PyObject*)codeobj, f->f_globals, u);')
             context.insert_line('Py_DECREF(u);')
             context.insert_line('if (func == NULL) {')
             context.insert_handle_error(line, label)
@@ -1012,7 +1024,9 @@ class Module(ModuleBase):
             if oparg >= 1:
                 context.insert_line('u = POP();')
 
-            context.insert_line('if (__pypperoni_IMPL_do_raise(u, v) == 0) {*why = WHY_EXCEPTION; goto fast_block_end;}')
+            context.insert_line('if (__pypperoni_IMPL_do_raise(u, v) == 0) {')
+            context.insert_line('  *why = WHY_EXCEPTION; goto fast_block_end;')
+            context.insert_line('}')
             context.insert_handle_error(line, label)
             context.end_block()
 
@@ -1071,7 +1085,8 @@ class Module(ModuleBase):
             context.insert_line('if PyLong_Check(x)')
             context.begin_block()
             context.insert_line('*why = PyLong_AS_LONG(x);')
-            context.insert_line('if (*why == WHY_RETURN || *why == WHY_CONTINUE) retval = POP();')
+            context.insert_line('if (*why == WHY_RETURN || *why == WHY_CONTINUE)')
+            context.insert_line('  retval = POP();')
             context.insert_line('if (*why == WHY_SILENCED)')
             context.begin_block()
             context.insert_line('block = PyFrame_BlockPop(f);')
@@ -1106,8 +1121,8 @@ class Module(ModuleBase):
             context.insert_handle_error(line, label)
             context.insert_line('}')
             context.insert_line('void* __addr;')
-            context.insert_line('GET_ADDRESS(__addr, label_%d);' % (label + oparg))
-            context.insert_line('PyFrame_BlockSetup(f, %d, __addr, STACK_LEVEL());' % op)
+            context.insert_line('GET_ADDRESS(__addr, label_%d);' % (label + oparg + 2))
+            context.insert_line('PyFrame_BlockSetup(f, SETUP_FINALLY, __addr, STACK_LEVEL());')
             context.insert_line('PUSH(x);')
             context.end_block()
 
@@ -1293,7 +1308,9 @@ class Module(ModuleBase):
             with Lock():
                 safePrint(context.codebuffer.read())
                 dis.disassemble(codeobj)
-            raise ValueError('%d (%s) @ %s/%s/%d' % (op, opname[op], self.name, codeobj.get_full_name(), label))
+            raise ValueError('%d (%s) @ %s/%s/%d' % (op, opname[op], self.name,
+                                                     codeobj.get_full_name(),
+                                                     label))
 
     def __gen_code(self, f, name, modules, codeobj, consts, flushconsts=False):
         buf = list(codeobj.read_code())
@@ -1389,6 +1406,7 @@ class Module(ModuleBase):
             yield _cur
 
     def generate_c_code(self, f, modules):
+        self.code = CodeObject(compile(self.astmod, self.name, 'exec', optimize=2))
         modname = '_%s_MODULE__' % self.name.replace('.', '_')
         self.__gen_code(f, modname, modules, self.code, [], True)
 
@@ -1401,20 +1419,7 @@ class Module(ModuleBase):
         orig_name = codeobj.co_names[context.buf[context.i][IDX_OPARG]]
         context.i += 1
 
-        # Convert relative to absolute imports
-        if level > 0:
-            if self.name.count('.') < (level - 1):
-                raise ImportError('bogus relative import: %s %s (%d)' % (self.name, name, level))
-
-            prefix = self.name.rsplit('.', level)[0]
-            if orig_name:
-                # from [...]orig_name import <etc>
-                orig_name = prefix + '.' + orig_name
-
-            else:
-                # from [...] import <etc>
-                orig_name = prefix
-
+        orig_name = self.__convert_relative_import(orig_name, level)
         import_name = self.__lookup_import(orig_name, context.modules)
         mod = context.modules[import_name]
         label = context.buf[context.i][IDX_LABEL]
@@ -1440,7 +1445,8 @@ class Module(ModuleBase):
                     tail_list = tail_list.split('.')
 
                     rootmod = context.modules[module]
-                    context.insert_line('w = x = __pypperoni_IMPL_import((uint64_t)%dU); /* %s */' % (rootmod.get_id(), rootmod.name))
+                    context.insert_line('w = x = __pypperoni_IMPL_import((uint64_t)%dU);'
+                                        ' /* %s */' % (rootmod.get_id(), rootmod.name))
                     context.insert_line('Py_INCREF(x);')
                     context.insert_line('if (x == NULL) {')
                     context.insert_handle_error(line, label)
@@ -1452,13 +1458,15 @@ class Module(ModuleBase):
                         tail = tail_list.pop(0)
                         modname += tail + '.'
                         mod = context.modules[modname[:-1]]
-                        context.insert_line('u = __pypperoni_IMPL_import((uint64_t)%dU); /* %s */' % (mod.get_id(), modname[:-1]))
+                        context.insert_line('u = __pypperoni_IMPL_import((uint64_t)%dU);'
+                                            ' /* %s */' % (mod.get_id(), modname[:-1]))
                         context.insert_line('if (u == NULL) {')
                         context.insert_line('Py_DECREF(x);')
                         context.insert_line('Py_DECREF(w);')
                         context.insert_handle_error(line, label)
                         context.insert_line('}')
-                        context.insert_line('PyObject_SetAttr(x, %s, u);' % context.register_const(tail))
+                        context.insert_line('PyObject_SetAttr(x, %s, u);' %
+                                            context.register_const(tail))
                         context.insert_line('Py_DECREF(x);')
                         context.insert_line('x = u;')
 
@@ -1472,7 +1480,8 @@ class Module(ModuleBase):
                     import_handled = True
 
             if not import_handled:
-                context.insert_line('x = __pypperoni_IMPL_import((uint64_t)%dU); /* %s */' % (mod.get_id(), mod.name))
+                context.insert_line('x = __pypperoni_IMPL_import((uint64_t)%dU);'
+                                    ' /* %s */' % (mod.get_id(), mod.name))
                 context.insert_line('if (x == NULL) {')
                 context.insert_handle_error(line, label)
                 context.insert_line('}')
@@ -1483,7 +1492,8 @@ class Module(ModuleBase):
 
         elif fromlist == ('*',):
             # Case 2: Import all
-            context.insert_line('x = __pypperoni_IMPL_import((uint64_t)%dU); /* %s */' % (mod.get_id(), mod.name))
+            context.insert_line('x = __pypperoni_IMPL_import((uint64_t)%dU);'
+                                ' /* %s */' % (mod.get_id(), mod.name))
             context.insert_line('if (x == NULL) {')
             context.insert_handle_error(line, label)
             context.insert_line('}')
@@ -1498,7 +1508,8 @@ class Module(ModuleBase):
         else:
             # Case 3: Importing N names
             context.add_decl_once('mod', 'PyObject*', 'NULL', False)
-            context.insert_line('mod = __pypperoni_IMPL_import((uint64_t)%dU); /* %s */' % (mod.get_id(), mod.name))
+            context.insert_line('mod = __pypperoni_IMPL_import((uint64_t)%dU);'
+                                ' /* %s */' % (mod.get_id(), mod.name))
             context.insert_line('if (mod == NULL) {')
             context.insert_handle_error(line, label)
             context.insert_line('}')
@@ -1509,15 +1520,19 @@ class Module(ModuleBase):
 
                 name = codeobj.co_names[oparg]
                 fullname = mod.name + '.' + name
-                fullname = self.__lookup_import(fullname, context.modules, importable=False)
+                fullname = self.__lookup_import(fullname, context.modules,
+                                                can_be_external=False)
                 if fullname in context.modules:
                     # We're either importing a name or a module
                     _mod = context.modules[fullname]
-                    context.insert_line('v = __pypperoni_IMPL_import_from_or_module(mod, %s, (uint64_t)%dU); /* %s */' % (context.register_const(name), _mod.get_id(), _mod.name))
+                    context.insert_line('v = __pypperoni_IMPL_import_from_or_module'
+                                        '(mod, %s, (uint64_t)%dU); /* %s */' %
+                                        (context.register_const(name), _mod.get_id(), _mod.name))
 
                 else:
                     # IMPORT_FROM
-                    context.insert_line('v = __pypperoni_IMPL_import_from(mod, %s);' % context.register_literal(name))
+                    context.insert_line('v = __pypperoni_IMPL_import_from(mod, %s);' %
+                                        context.register_literal(name))
 
                 context.insert_line('if (v == NULL) {')
                 context.insert_line('Py_DECREF(mod);')
@@ -1536,7 +1551,69 @@ class Module(ModuleBase):
 
         context.end_block()
 
-    def __lookup_import(self, name, modules, importable=True):
+    def __convert_relative_import(self, name, level):
+        '''
+        Converts relative to absolute imports.
+        '''
+        if level > 0:
+            if self.is_package():
+                level -= 1
+
+            if self.name.count('.') < (level - 1):
+                raise ImportError('bogus relative import: %s %s (%d)' % (self.name, name, level))
+
+            prefix = self.name.rsplit('.', level)[0]
+            if name:
+                # from [...]name import <etc>
+                name = prefix + '.' + name
+
+            else:
+                # from [...] import <etc>
+                name = prefix
+
+        return name
+
+    def resolve_import_from_name(self, modules, name, level=0, can_be_external=True):
+        '''
+        Resolves a module from name and level. This returns None
+        if the module doesn't exist.
+        '''
+        name = self.__convert_relative_import(name, level)
+        name = self.__lookup_import(name, modules, can_be_external)
+        if not name:
+            return None
+
+        return modules[name]
+
+    def resolve_imports_from_node(self, modules, node):
+        '''
+        Yields a list of module parsed from an AST node.
+        'node' must be of type Import or ImportFrom.
+        '''
+        if isinstance(node, ast.ImportFrom):
+            module = self.__convert_relative_import(node.module, node.level)
+            mod = self.resolve_import_from_name(modules, module)
+            yield mod
+
+            for alias in node.names:
+                name = module + '.' + alias.name
+                mod = self.resolve_import_from_name(modules, name, can_be_external=False)
+                if mod:
+                    yield mod
+
+        else:
+            for alias in node.names:
+                mod = self.resolve_import_from_name(modules, alias.name)
+                yield mod
+
+    def __lookup_import(self, name, modules, can_be_external=True):
+        '''
+        Lookups modules dict to find a module by name.
+        This will either return a name that is guaranteed
+        to exist in modules or None. If can_be_external is
+        True, it will register a builtin or external module
+        as required (in which case it will never return None).
+        '''
         if name in IMPORT_ALIASES:
             name = IMPORT_ALIASES[name]
 
@@ -1545,7 +1622,7 @@ class Module(ModuleBase):
             return name
 
         # Builtin?
-        if importable:
+        if can_be_external:
             try:
                 __import__(name)
 
@@ -1560,22 +1637,39 @@ class Module(ModuleBase):
                 return name
 
 
+class PackageModule(Module):
+    '''
+    Use this for modules that were originally __init__.py files.
+    '''
+    def is_package(self):
+        return True
+
+
 class NullModule(Module):
+    '''
+    Use this for empty modules.
+    '''
+
     def __init__(self, name):
-        code = CodeObject(compile('', name, 'exec'))
-        Module.__init__(self, name, code)
+        Module.__init__(self, name, '')
 
 
 class ExternalModule(ModuleBase):
+    '''
+    This is used to represent a module that could not be found
+    at compile time (e.g. nt doesn't exist on Unix systems).
+    '''
     def __init__(self, name):
-        code = CodeObject(compile('', name, 'exec'))
-        ModuleBase.__init__(self, name, code)
+        ModuleBase.__init__(self, name, '')
 
     def is_external(self):
         return True
 
 
 class BuiltinModule(ExternalModule):
+    '''
+    This is used to represent a builtin module.
+    '''
     pass
 
 

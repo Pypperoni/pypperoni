@@ -36,7 +36,6 @@ PyObject* __pypperoni_IMPL_load_name(PyFrameObject* f, PyObject* name)
     PyObject* v = f->f_locals;
     if (PyDict_CheckExact(v)) {
         x = PyDict_GetItem(v, name);
-        Py_XINCREF(x);
     }
     else {
         x = PyObject_GetItem(v, name);
@@ -60,7 +59,6 @@ PyObject* __pypperoni_IMPL_load_name(PyFrameObject* f, PyObject* name)
                 return NULL;
             }
         }
-        Py_INCREF(x);
     }
 
     Py_DECREF(name);
@@ -1331,18 +1329,63 @@ int __pypperoni_IMPL_import_star(PyFrameObject* f, PyObject* mod)
     return err;
 }
 
+static PyMethodDef describeException_def;
+
+#define PyTraceBack_LIMIT 1000
+
+static PyObject* describeException(PyObject* self, PyObject* args)
+{
+    _Py_IDENTIFIER(__name__);
+
+    PyThreadState* tstate = PyThreadState_GET();
+    PyObject* tb = tstate->exc_traceback;
+    PyFrameObject* exc_frame;
+    PyObject* stack[PyTraceBack_LIMIT];
+    PyObject* result;
+    int i, depth = 0;
+
+    if (tb == NULL || tb == Py_None)
+        return PyUnicode_FromString("");
+
+    exc_frame = ((PyTracebackObject*)tb)->tb_frame;
+    while (exc_frame != NULL && exc_frame->f_lineno > 0 && depth < PyTraceBack_LIMIT)
+    {
+        PyObject* modname = _PyDict_GetItemId(exc_frame->f_globals,
+                                              &PyId___name__);
+        stack[depth++] = PyUnicode_FromFormat("In \"%U\", instr %d, line %d", modname,
+                                              exc_frame->f_lasti,
+                                              exc_frame->f_lineno);
+        exc_frame = exc_frame->f_back;
+    }
+
+    result = PyUnicode_FromString("");
+    for (i = --depth; i >= 0; i--)
+    {
+        PyObject* formatted = PyUnicode_FromFormat("#%d %U\n", i, stack[i]);
+        Py_DECREF(stack[depth]);
+        PyUnicode_Append(&result, formatted);
+    }
+
+    return result;
+}
+
 /* Setup and main */
 void setup_pypperoni()
 {
+    const char* _def_encoding = "UTF-8";
+
     /* Register encodings module */
     PyImport_AppendInittab("encodings", load_encodings); /* provided by modules.I */
 
     /* Initialize Python */
+    Py_IsolatedFlag++;
     Py_IgnoreEnvironmentFlag++;
     Py_NoSiteFlag++;
     Py_FrozenFlag++;
 
-    Py_FileSystemDefaultEncoding = "UTF-8";
+    /* Py_FileSystemDefaultEncoding must be malloc'ed */
+    Py_FileSystemDefaultEncoding = malloc(sizeof(_def_encoding));
+    strcpy((char*)Py_FileSystemDefaultEncoding, _def_encoding);
 
     Py_Initialize();
     PyEval_InitThreads();
@@ -1351,7 +1394,12 @@ void setup_pypperoni()
     PyObject* pypperonimod = PyImport_AddModule("__pypperoni__");
     PyObject* bt = PyEval_GetBuiltins();
     PyDict_SetItemString(bt, "__pypperoni__", pypperonimod);
-    Py_INCREF(pypperonimod);
+
+    describeException_def.ml_name = "describeException";
+    describeException_def.ml_meth = (PyCFunction)describeException;
+    describeException_def.ml_flags = METH_NOARGS;
+    PyObject_SetAttrString(pypperonimod, "describeException",
+                           PyCFunction_New(&describeException_def, NULL));
 
     PyObject_SetAttrString(pypperonimod, "platform", PyUnicode_FromString(
 #ifdef WIN32
@@ -1364,14 +1412,36 @@ void setup_pypperoni()
       "linux"
 #endif
     ));
+
+    Py_DECREF(pypperonimod);
 }
 
-static PyMethodDef def;
-
-int __pypperoni_IMPL_main()
+int __pypperoni_IMPL_main(int argc, char* argv[])
 {
+    /* XXX TODO: Handle unicode properly */
+    int i;
+    PyObject* av = PyList_New(argc);
+    if (av == NULL)
+        goto argv_error;
+
+    for (i = 0; i < argc; i++)
+    {
+        PyObject* v = PyUnicode_FromString(argv[i]);
+        if (v == NULL)
+            goto argv_error;
+
+        PyList_SetItem(av, i, v);
+    }
+
+    if (PySys_SetObject("argv", av) != 0)
+        goto argv_error;
+
     if (__pypperoni_IMPL_import(0) != NULL)
         return 0;
 
     return 1;
+
+argv_error:
+    Py_XDECREF(av);
+    Py_FatalError("can't assign sys.argv");
 }

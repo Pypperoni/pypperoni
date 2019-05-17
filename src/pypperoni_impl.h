@@ -376,7 +376,7 @@ static inline int __pypperoni_IMPL_unary_not(PyObject* v, PyObject** x)
 }
 
 void setup_pypperoni();
-int __pypperoni_IMPL_main();
+int __pypperoni_IMPL_main(int argc, char* argv[]);
 
 #ifdef __cplusplus
 }

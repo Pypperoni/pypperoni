@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
     int ret;
 
     setup_pypperoni();
-    ret = __pypperoni_IMPL_main();
+    ret = __pypperoni_IMPL_main(argc, argv);
     if (ret != 0)
     {
         PyErr_Print();

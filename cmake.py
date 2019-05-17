@@ -16,7 +16,8 @@
 # License.
 
 from .files import ConditionalFile, FileContainer
-from .module import Module, write_modules_file
+from .module import Module, PackageModule, write_modules_file
+from .modulereducer import reduce_modules
 from .util import safePrint
 
 from threading import Thread, Lock
@@ -54,16 +55,23 @@ class CMakeFileGenerator:
         with open(filename, 'rb') as f:
             data = f.read()
 
+        is_pkg = False
         if name is None:
             name = os.path.normpath(filename.rsplit('.', 1)[0]).replace(os.sep, '.')
             if name.endswith('.__init__'):
                 name = name[:-9]
+                is_pkg = True
 
-        self.add_module(name, data)
+        self.add_module(name, data, is_pkg)
 
-    def add_module(self, name, data):
-        code = compile(data, name, 'exec')
-        self.modules[name] = Module(name, code)
+    def add_module(self, name, data, is_pkg=False):
+        if is_pkg:
+            obj = PackageModule(name, data)
+
+        else:
+            obj = Module(name, data)
+
+        self.modules[name] = obj
 
     def add_directory(self, path):
         '''
@@ -170,6 +178,9 @@ class CMakeFileGenerator:
                     os._exit(1)
 
     def run(self):
+        # Apply modulereducer
+        reduce_modules(self.modules)
+
         modules_dir = os.path.join(self.outputdir, 'gen', 'modules')
         if not os.path.isdir(modules_dir):
             os.makedirs(modules_dir)
