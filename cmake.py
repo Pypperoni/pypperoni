@@ -150,7 +150,11 @@ class CMakeFileGenerator:
         f = FileContainer(prefix, self.hash_file)
         module.generate_c_code(f, self.modules)
         with Lock():
-            self.__files.extend(os.path.join('modules', os.path.basename(x[0])) for x in f.close())
+            for x in f.close():
+                # build/gen/blah -> gen/blah
+                x = x[0].replace('\\', '/')
+                x = x.split(os.sep, 1)[-1]
+                self.__files.append(x)
 
     def __worker(self):
         while True:
@@ -205,11 +209,11 @@ class CMakeFileGenerator:
         filename = os.path.join(self.outputdir, 'gen', 'modules.I')
         f = ConditionalFile(filename, self.hash_file)
         write_modules_file(f, self.modules)
-        self.__files.append(os.path.basename(f.close()[0]))
+        self.__files.append('gen/' + os.path.basename(f.close()[0]))
 
         files = ''
         for filename in self.__files:
-            files += '     %s\n' % os.path.join('gen', filename).replace('\\', '/')
+            files += '     %s\n' % filename
 
         with open(self.cmake_in_file, 'r') as f:
             cmakein = f.read()

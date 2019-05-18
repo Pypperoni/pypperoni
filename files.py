@@ -67,7 +67,7 @@ class ConditionalFile:
 
 class FileContainer:
     def __init__(self, prefix, hashfunc):
-        self.prefix = prefix
+        self.prefix = prefix.replace('.', '/')
         self.hashfunc = hashfunc
 
         self.uid = os.path.basename(prefix).replace('.', '_')
@@ -75,6 +75,10 @@ class FileContainer:
         self.headername = self.prefix + '.h'
         self.header = ConditionalFile(self.headername, self.hashfunc)
         self.header.write('#include "pypperoni_impl.h"\n')
+
+        prefix_dir = os.path.dirname(self.prefix)
+        if not os.path.isdir(prefix_dir):
+            os.makedirs(prefix_dir)
 
         self.files = []
         self.filenames = []
@@ -97,7 +101,6 @@ class FileContainer:
         self.header.write(header + '\n')
 
     def close(self):
-        yield self.header.close()
-
+        self.header.close()
         for f in self.files:
             yield f.close()
