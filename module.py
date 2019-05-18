@@ -160,7 +160,6 @@ class Module(ModuleBase):
             else:
                 if value is None:
                     context.insert_line('x = Py_None;')
-                    context.insert_line('Py_INCREF(x);')
 
                 else:
                     getter = context.register_const(value)
@@ -169,6 +168,7 @@ class Module(ModuleBase):
                     context.insert_handle_error(line, label)
                     context.insert_line('}')
 
+                context.insert_line('Py_INCREF(x);')
                 context.insert_line('PUSH(x);')
                 context.end_block()
 
@@ -1338,6 +1338,7 @@ class Module(ModuleBase):
         f.write('\nPyObject* %s(PyFrameObject* f) {\n' % name)
         f.write('  PyObject* retval = NULL;\n')
         f.write('  int why;\n\n')
+        f.write('  __%s_load_consts();\n' % f.uid)
         for i in range(1, chunki + 1):
             chunkname = '%s_%d' % (name, i)
             f.write('  {\n')

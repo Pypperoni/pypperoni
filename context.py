@@ -208,13 +208,13 @@ class Context:
     def register_const(self, value):
         with Lock():
             self._consts.append(value)
-            ret = '__%s_get_const(%d)' % (self.file.uid, len(self._consts) - 1)
+            ret = '__consts_%s[%d]' % (self.file.uid, len(self._consts) - 1)
 
         return ret
 
     def register_literal(self, value):
         getter = self.register_const(value)
-        return '__pypperoni_const2str(%s) /* %s */' % (getter, value)
+        return 'PyUnicode_AsUTF8(%s) /* %s */' % (getter, value)
 
     def dumpconsts(self):
         return marshal.dumps(tuple(self._consts))
@@ -222,9 +222,10 @@ class Context:
     def flushconsts(self):
         blob = self.dumpconsts()
         blobsize = len(blob)
-        blobptr = '__data_blob_%s' % self.name
+        blobptr = '__data_blob_' + self.file.uid
+        pageptr = '__consts_' + self.file.uid
 
-        self.file.write('const char %s[%d] = {\n  ' % (blobptr, blobsize))
+        self.file.write('static const char %s[%d] = {\n  ' % (blobptr, blobsize))
 
         i = 0
         for c in blob:
@@ -234,14 +235,13 @@ class Context:
                 self.file.write('\n  ')
 
         self.file.write('};\n\n')
-        self.file.add_common_header('PyObject* __%s_get_const(Py_ssize_t index);\n' % self.file.uid)
-        self.file.write('PyObject* __%s_get_const(Py_ssize_t index) {\n' % self.file.uid)
-        self.file.write('  PyObject* it;\n')
-        self.file.write('  static PyObject* page = NULL;\n')
-        self.file.write('  if (page == NULL) {\n')
-        self.file.write('     page = PyMarshal_ReadObjectFromString((char*)%s, %d);\n' % (blobptr, blobsize))
+        self.file.add_common_header('void __%s_load_consts();' % self.file.uid)
+        self.file.add_common_header('PyObject** %s;' % pageptr)
+        self.file.write('void __%s_load_consts() {\n' % self.file.uid)
+        self.file.write('  if (%s == NULL) {\n' % pageptr)
+        self.file.write('     PyTupleObject* t = (PyTupleObject*)'
+                        'PyMarshal_ReadObjectFromString((char*)%s, %d);' %
+                        (blobptr, blobsize))
+        self.file.write('     %s = t->ob_item;\n' % pageptr)
         self.file.write('  }\n')
-        self.file.write('  it = PyTuple_GET_ITEM(page, index);\n')
-        self.file.write('  Py_INCREF(it);\n')
-        self.file.write('  return it;\n')
         self.file.write('}\n\n')

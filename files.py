@@ -72,7 +72,10 @@ class FileContainer:
 
         self.uid = os.path.basename(prefix).replace('.', '_')
 
-        self.headers = ['#include "pypperoni_impl.h"']
+        self.headername = self.prefix + '.h'
+        self.header = ConditionalFile(self.headername, self.hashfunc)
+        self.header.write('#include "pypperoni_impl.h"\n')
+
         self.files = []
         self.filenames = []
         self.__next()
@@ -80,6 +83,7 @@ class FileContainer:
     def __next(self):
         self.filenames.append('%s_%d.c' % (self.prefix, len(self.filenames) + 1))
         f = ConditionalFile(self.filenames[-1], self.hashfunc)
+        f.write('#include "%s"\n\n' % os.path.basename(self.headername))
         self.files.append(f)
 
     def write(self, *args):
@@ -90,17 +94,10 @@ class FileContainer:
             self.__next()
 
     def add_common_header(self, header):
-        self.headers.append(header)
+        self.header.write(header + '\n')
 
     def close(self):
-        for fname, f in zip(self.filenames, self.files):
-            f.seek(0)
-            data = f.read()
-            f.seek(0)
+        yield self.header.close()
 
-            for header in self.headers:
-                f.write(header + '\n')
-
-            f.write('\n')
-            f.write(data)
+        for f in self.files:
             yield f.close()

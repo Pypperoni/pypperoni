@@ -107,12 +107,6 @@ typedef struct _pypperoni_module {
     } while (0)
 #endif
 
-static inline const char* __pypperoni_const2str(PyObject* strobj)
-{
-    Py_DECREF(strobj);
-    return PyUnicode_AsUTF8(strobj);
-}
-
 PyObject* __pypperoni_IMPL_load_name(PyFrameObject* f, PyObject* name);
 PyObject* __pypperoni_IMPL_load_global(PyFrameObject* f, PyObject* name);
 int __pypperoni_IMPL_compare(PyObject* w, PyObject* v, int op, PyObject** result);

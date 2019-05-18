@@ -28,7 +28,6 @@ PyObject* __pypperoni_IMPL_load_name(PyFrameObject* f, PyObject* name)
         PyErr_Format(PyExc_SystemError,
                      "no locals when loading %R",
                      name);
-        Py_DECREF(name);
         return NULL;
     }
 
@@ -42,7 +41,6 @@ PyObject* __pypperoni_IMPL_load_name(PyFrameObject* f, PyObject* name)
         if (x == NULL && PyErr_Occurred()) {
             if (!PyErr_ExceptionMatches(PyExc_KeyError))
             {
-                Py_DECREF(name);
                 return NULL;
             }
             PyErr_Clear();
@@ -55,13 +53,11 @@ PyObject* __pypperoni_IMPL_load_name(PyFrameObject* f, PyObject* name)
             x = PyDict_GetItem(f->f_builtins, name);
             if (x == NULL) {
                 PyErr_Format(PyExc_NameError, "name '%R' is not defined", name);
-                Py_DECREF(name);
                 return NULL;
             }
         }
     }
 
-    Py_DECREF(name);
     return x;
 }
 
@@ -80,7 +76,7 @@ PyObject* __pypperoni_IMPL_load_global(PyFrameObject* f, PyObject* name)
                  * an exception if the key doesn't exist */
                 PyErr_Format(PyExc_NameError, "name %R is not defined", name);
             }
-            goto error;
+            return NULL;
         }
         Py_INCREF(v);
     }
@@ -91,7 +87,7 @@ PyObject* __pypperoni_IMPL_load_global(PyFrameObject* f, PyObject* name)
         v = PyObject_GetItem(f->f_globals, name);
         if (v == NULL) {
             if (!PyErr_ExceptionMatches(PyExc_KeyError))
-                goto error;
+                return NULL;
             PyErr_Clear();
 
             /* namespace 2: builtins */
@@ -99,15 +95,11 @@ PyObject* __pypperoni_IMPL_load_global(PyFrameObject* f, PyObject* name)
             if (v == NULL) {
                 if (PyErr_ExceptionMatches(PyExc_KeyError))
                     PyErr_Format(PyExc_NameError, "name '%R' is not defined", name);
-                goto error;
+                return NULL;
             }
         }
     }
-    goto end;
-error:
-    v = NULL;
-end:
-    Py_DECREF(name);
+
     return v;
 }
 
