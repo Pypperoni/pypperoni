@@ -56,7 +56,7 @@ class Context:
 
         self._consts = []
 
-    def finish(self):
+    def finish(self, encapsulated):
         self.insert_line('goto end;')
         self.insert_line('error:')
         self.insert_line('  *why = WHY_EXCEPTION;')
@@ -130,10 +130,36 @@ class Context:
                 self.insert_line('  Py_XDECREF(%s);' % d[0])
 
         self.insert_line('f->f_stacktop = stack_pointer;')
-        self.insert_line('return retval;')
 
-        self.file.add_common_header('PyObject* %s(PyFrameObject* f, int* why);' % self.name)
-        self.file.write('PyObject* %s(PyFrameObject* f, int* why) {\n' % self.name)
+        if encapsulated:
+            self.insert_line('return retval;')
+
+        else:
+            self.insert_line('if (*why == WHY_EXCEPTION) goto non_encapsulated_error;')
+            self.insert_line('else if (*why == WHY_YIELD) goto non_encapsulated_end;')
+            self.insert_line('goto clear_stack;')
+            self.insert_line('non_encapsulated_error:')
+            self.insert_line('PyTraceBack_Here(f);')
+            self.insert_line('clear_stack: /* Clear stack */')
+            self.begin_block()
+            self.insert_line('PyObject** stack_pointer = f->f_stacktop;')
+            self.insert_line('while (STACK_LEVEL() > 0) {')
+            self.insert_line('Py_XDECREF(TOP());')
+            self.insert_line('STACKADJ(-1);')
+            self.insert_line('}')
+            self.insert_line('f->f_stacktop = NULL;')
+            self.end_block()
+            self.insert_line('non_encapsulated_end:')
+            self.insert_line('return _Py_CheckFunctionResult(NULL, retval, %s);' % self.register_literal(self.name))
+
+        if encapsulated:
+            self.file.add_common_header('PyObject* %s(PyFrameObject* f, int* why);' % self.name)
+            self.file.write('PyObject* %s(PyFrameObject* f, int* why) {\n' % self.name)
+
+        else:
+            self.file.add_common_header('PyObject* %s(PyFrameObject* f);' % self.name)
+            self.file.write('PyObject* %s(PyFrameObject* f) {\n' % self.name)
+
         for d in self.__decls:
             if d[2] is not None:
                 self.file.write('  %s %s = %s;\n' % (d[1], d[0], d[2]))
@@ -145,6 +171,12 @@ class Context:
         self.file.write('  PyObject **stack_pointer = f->f_stacktop;\n')
         self.file.write('  PyObject **fastlocals = f->f_localsplus;\n')
         self.file.write('  PyObject **freevars = f->f_localsplus + %d;\n' % self.nlocals)
+
+        if not encapsulated:
+            self.file.write('  int _why, *why;\n')
+            self.file.write('  why = &_why;\n')
+            self.file.write('  __%s_load_consts();\n' % self.file.uid)
+
         self.file.write('  *why = WHY_NOT;\n')
 
         if self.flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR):
@@ -160,7 +192,7 @@ class Context:
             self.file.write('  assert(!PyErr_Occurred());\n')
 
         self.codebuffer.seek(0)
-        self.file.write(self.codebuffer.read() + '}\n')
+        self.file.write(self.codebuffer.read() + '}\n\n')
         self.file.consider_next()
 
     def flushconsts(self):
@@ -240,7 +272,7 @@ class Context:
         self.file.write('void __%s_load_consts() {\n' % self.file.uid)
         self.file.write('  if (%s == NULL) {\n' % pageptr)
         self.file.write('     PyTupleObject* t = (PyTupleObject*)'
-                        'PyMarshal_ReadObjectFromString((char*)%s, %d);' %
+                        'PyMarshal_ReadObjectFromString((char*)%s, %d);\n' %
                         (blobptr, blobsize))
         self.file.write('     %s = t->ob_item;\n' % pageptr)
         self.file.write('  }\n')

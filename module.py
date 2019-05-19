@@ -1315,26 +1315,54 @@ class Module(ModuleBase):
     def __gen_code(self, f, name, modules, codeobj, consts, flushconsts=False):
         buf = list(codeobj.read_code())
         chunki = 0
-        codeobjs = []
-        for chunk in self.__split_buf(buf, codeobj):
-            chunki += 1
-            chunkname = '%s_%d' % (name, chunki)
-            context = self.get_context(f, chunkname, modules, codeobj.co_flags, codeobj.co_nlocals)
-            context._consts = consts
-            context.codeobjs = codeobjs
-
-            context.buf = tuple(chunk)
-            context.i = 0
-            while context.i < len(context.buf):
-                label, op, oparg, line = context.buf[context.i]
-                context.i += 1
-
-                self.__handle_one_instr(codeobj, context, label, op, oparg, line)
-
-            context.finish()
-            codeobjs = context.codeobjs
+        chunks = list(self.__split_buf(buf, codeobj))
 
         f.add_common_header('PyObject* %s(PyFrameObject* f);' % name)
+
+        if len(chunks) > 1:
+            context = self.__handle_chunks(chunks, f, name, modules, codeobj, consts,)
+
+        else:
+            context = self.__handle_chunk(chunks[0], f, name, modules, codeobj, consts, [])
+            context.finish(False)
+
+        if flushconsts:
+            context.flushconsts()
+
+    def __handle_chunk(self, chunk, f, chunkname, modules, codeobj, consts, codeobjs):
+        '''
+        Handles a single chunk of code and returns a Context object.
+        '''
+        context = self.get_context(f, chunkname, modules,
+                                   codeobj.co_flags,
+                                   codeobj.co_nlocals)
+        context._consts = consts
+        context.codeobjs = codeobjs
+
+        context.buf = tuple(chunk)
+        context.i = 0
+        while context.i < len(context.buf):
+            label, op, oparg, line = context.buf[context.i]
+            context.i += 1
+
+            self.__handle_one_instr(codeobj, context, label, op, oparg, line)
+
+        return context
+
+    def __handle_chunks(self, chunks, f, name, modules, codeobj, consts):
+        '''
+        Handles and encapsulates multiple chunks of code.
+        '''
+        codeobjs = []
+        chunki = 0
+        for chunk in chunks:
+            chunki += 1
+            chunkname = '%s_%d' % (name, chunki)
+            context = self.__handle_chunk(chunk, f, chunkname, modules,
+                                          codeobj, consts, codeobjs)
+            context.finish(True)
+            codeobjs = context.codeobjs
+
         f.write('\nPyObject* %s(PyFrameObject* f) {\n' % name)
         f.write('  PyObject* retval = NULL;\n')
         f.write('  int why;\n\n')
@@ -1363,14 +1391,14 @@ class Module(ModuleBase):
         f.write('  return _Py_CheckFunctionResult(NULL, retval, "%s");\n' % name)
         f.write('}\n\n')
 
-        if flushconsts:
-            context.flushconsts()
+        return context
 
     def get_context(self, f, name, modules, flags, nlocals):
         return Context(f, name, modules, flags, nlocals)
 
     def __split_buf(self, buf, codeobj):
         if codeobj.co_flags & CO_GENERATOR:
+            # No splitting generators
             yield buf
             return
 
