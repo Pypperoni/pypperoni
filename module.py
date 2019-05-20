@@ -1435,9 +1435,12 @@ class Module(ModuleBase):
             yield _cur
 
     def generate_c_code(self, f, modules):
-        self.code = CodeObject(compile(self.astmod, self.name, 'exec', optimize=2))
+        self.code = self.get_code()
         modname = '_%s_MODULE__' % self.name.replace('.', '_')
         self.__gen_code(f, modname, modules, self.code, [], True)
+
+    def get_code(self):
+        return CodeObject(compile(self.astmod, self.name, 'exec', optimize=2))
 
     def __handle_import(self, codeobj, context, level):
         # Get fromlist
