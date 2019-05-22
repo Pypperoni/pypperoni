@@ -60,7 +60,3 @@ class CodeObject:
 
             if op != EXTENDED_ARG:
                 yield (i, op, oparg, line)
-
-            else:
-                # Yield a NOP just in case there's a jump to this label
-                yield (i, NOP, None, line)

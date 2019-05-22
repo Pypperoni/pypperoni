@@ -72,7 +72,7 @@ class FileContainer:
 
         self.uid = os.path.basename(prefix).replace('.', '_')
 
-        self.headername = self.prefix + '.h'
+        self.headername = self.prefix + '.pyp.h'
         self.header = ConditionalFile(self.headername, self.hashfunc)
         self.header.write('#include "pypperoni_impl.h"\n')
 

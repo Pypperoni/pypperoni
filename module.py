@@ -147,7 +147,7 @@ class Module(ModuleBase):
 
             value = codeobj.co_consts[oparg]
             if isinstance(value, types.CodeType):
-                context.insert_line('/* LOADED CODE OBJECT */')
+                context.insert_line('/* LOADED CODE OBJECT %s */' % value)
                 context.codeobjs.append(CodeObject(value))
                 context.end_block()
 
@@ -602,7 +602,8 @@ class Module(ModuleBase):
         elif op == LOAD_NAME:
             context.begin_block()
             name = codeobj.co_names[oparg]
-            context.insert_line('x = __pypperoni_IMPL_load_name(f, %s);' % context.register_const(name))
+            context.insert_line('x = __pypperoni_IMPL_load_name(f, %s); /* %s */' % (
+                                context.register_const(name), safeRepr(name)))
             context.insert_line('if (x == NULL) {')
             context.insert_handle_error(line, label)
             context.insert_line('}')

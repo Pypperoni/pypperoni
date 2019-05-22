@@ -34,6 +34,7 @@ class Context:
 
         self.codeobjs = []
         self.yield_labels = []
+        self._last_label = -2
 
         self.buf = []
         self.i = 0
@@ -235,7 +236,9 @@ class Context:
         self.__decls.append((name, type, val, deref))
 
     def insert_label(self, label):
-        self.insert_line('label_%d:' % label)
+        while self._last_label < label:
+            self._last_label += 2
+            self.insert_line('label_%d:' % self._last_label)
 
     def register_const(self, value):
         with Lock():
