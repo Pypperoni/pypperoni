@@ -30,7 +30,7 @@ extern "C" {
 typedef struct _pypperoni_module {
     int64_t index;
     int type;
-    int parent;
+    int64_t parent;
     PyObject*(*ptr)(PyFrameObject*);
     const char* name;
     int stacksize;
