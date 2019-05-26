@@ -67,11 +67,15 @@ class ConditionalFile:
 
 
 class FileContainer:
-    def __init__(self, prefix, hashfunc):
+    def __init__(self, prefix, hashfunc, uid=None):
         self.prefix = prefix.replace('.', '/')
         self.hashfunc = hashfunc
 
-        self.uid = os.path.basename(prefix).replace('.', '_')
+        if uid:
+            self.uid = uid
+
+        else:
+            self.uid = os.path.basename(prefix).replace('.', '_')
 
         self.headername = self.prefix + '.pyp.h'
         self.header = ConditionalFile(self.headername, self.hashfunc)
