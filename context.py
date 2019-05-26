@@ -158,7 +158,7 @@ class Context:
             self.file.write('PyObject* %s(PyFrameObject* f, int* why) {\n' % self.name)
 
         else:
-            self.file.add_common_header('PyObject* %s(PyFrameObject* f);' % self.name)
+            # N.B. function prototype is already added by Module.__gen_code
             self.file.write('PyObject* %s(PyFrameObject* f) {\n' % self.name)
 
         for d in self.__decls:
