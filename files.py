@@ -17,6 +17,7 @@
 
 from . import config
 
+from threading import Lock
 from io import StringIO
 import os
 
@@ -78,7 +79,11 @@ class FileContainer:
 
         prefix_dir = os.path.dirname(self.prefix)
         if not os.path.isdir(prefix_dir):
-            os.makedirs(prefix_dir)
+            try:
+                os.makedirs(prefix_dir)
+
+            except FileExistsError:
+                pass
 
         self.files = []
         self.filenames = []
@@ -101,6 +106,6 @@ class FileContainer:
         self.header.write(header + '\n')
 
     def close(self):
-        self.header.close()
+        yield self.header.close()
         for f in self.files:
             yield f.close()

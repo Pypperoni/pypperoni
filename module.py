@@ -147,7 +147,7 @@ class Module(ModuleBase):
 
             value = codeobj.co_consts[oparg]
             if isinstance(value, types.CodeType):
-                context.insert_line('/* LOADED CODE OBJECT %s */' % value)
+                context.insert_line('/* LOADED CODE OBJECT */')
                 context.codeobjs.append(CodeObject(value))
                 context.end_block()
 
