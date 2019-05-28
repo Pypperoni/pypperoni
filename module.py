@@ -561,7 +561,7 @@ class Module(ModuleBase):
             context.end_block()
 
             for i in range(oparg):
-                context.insert_line('v = PyTuple_GET_ITEM(x, %d);' % i)
+                context.insert_line('v = PyTuple_GET_ITEM(x, %d);' % (oparg - i - 1))
                 context.insert_line('w = POP();')
                 context.insert_line('err = PyDict_SetItem(u, v, w);')
                 context.insert_line('Py_DECREF(w);')
