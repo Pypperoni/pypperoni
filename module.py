@@ -1480,10 +1480,10 @@ class Module(ModuleBase):
                     rootmod = context.modules[module]
                     context.insert_line('w = x = __pypperoni_IMPL_import((uint64_t)%dU);'
                                         ' /* %s */' % (rootmod.get_id(), rootmod.name))
-                    context.insert_line('Py_INCREF(x);')
                     context.insert_line('if (x == NULL) {')
                     context.insert_handle_error(line, label)
                     context.insert_line('}')
+                    context.insert_line('Py_INCREF(x);')
 
                     modname = module + '.'
                     while tail_list:
