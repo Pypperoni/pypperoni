@@ -71,7 +71,7 @@ class Context:
         self.insert_line('if (b->b_type == SETUP_LOOP && *why == WHY_CONTINUE)')
         self.begin_block()
         self.insert_line('*why = WHY_NOT;')
-        self.insert_line('_jmpto = (void*)(PyLong_AS_LONG(retval));')
+        self.insert_line('_jmpto = (void*)(PyLong_AsSsize_t(retval));')
         self.insert_line('Py_DECREF(retval);')
         self.insert_line('JUMP_TO_ADDR(_jmpto);')
         self.end_block()

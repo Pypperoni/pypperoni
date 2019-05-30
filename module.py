@@ -1055,7 +1055,9 @@ class Module(ModuleBase):
 
         elif op == CONTINUE_LOOP:
             context.begin_block()
-            context.insert_line('retval = PyLong_FromLong(%d);' % oparg)
+            context.insert_line('void* __addr;')
+            context.insert_line('GET_ADDRESS(__addr, label_%d);' % oparg)
+            context.insert_line('retval = PyLong_FromSsize_t((Py_ssize_t)__addr);')
             context.insert_line('*why = WHY_CONTINUE; goto fast_block_end;')
             context.end_block()
 
