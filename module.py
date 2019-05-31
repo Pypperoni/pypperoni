@@ -271,7 +271,6 @@ class Module(ModuleBase):
             context.begin_block()
 
             name = codeobj.co_names[oparg]
-            context.insert_line('x = POP();')
             context.insert_line('v = f->f_locals;')
             context.insert_line('if (v == NULL) {')
             context.insert_line('PyErr_SetString(PyExc_SystemError, "no locals");')
