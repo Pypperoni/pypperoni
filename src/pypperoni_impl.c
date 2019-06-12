@@ -373,6 +373,7 @@ PyObject* __pypperoni_IMPL_ensure_kwdict(PyObject* kwdict, PyObject* func)
         PyObject *d = PyDict_New();
         if (d != NULL && PyDict_Update(d, kwdict) != 0) {
            Py_DECREF(d);
+           d = NULL;
            if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
                PyErr_Format(PyExc_TypeError,
                             "%.200s%.200s argument after ** "

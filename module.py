@@ -422,10 +422,10 @@ class Module(ModuleBase):
                 context.insert_line('Py_DECREF(u);')
                 context.insert_handle_error(line, label)
                 context.insert_line('}')
-                context.insert_line('Py_DECREF(v);')
 
             for i in range(oparg):
-                context.insert_line('Py_DECREF(POP());')
+                context.insert_line('x = POP();')
+                context.insert_line('Py_DECREF(x);')
 
             context.insert_line('PUSH(u);')
             context.end_block()
