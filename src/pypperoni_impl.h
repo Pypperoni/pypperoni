@@ -87,23 +87,13 @@ typedef struct _pypperoni_module {
 #define WHY_SILENCED 0x0080
 
 #ifdef HAVE_COMPUTED_GOTOS
-    #define GET_ADDRESS(var, label) var = &&label;
+    #define GET_ADDRESS(var, label, idx) var = &&label;
     #define JUMP_TO_ADDR(addr) goto *(addr);
 #else
-    #if UINTPTR_MAX > 0xFFFFFFFF // x64: use rax
-        #define GET_ADDRESS(var, label) do { \
-            __asm lea rax, label \
-            __asm mov var, rax \
-        } while(0)
-    #else // not x64: use eax
-        #define GET_ADDRESS(var, label) do { \
-            __asm lea eax, label \
-            __asm mov var, eax \
-        } while(0)
-        #endif
+    #define GET_ADDRESS(var, label, idx) var = (void*)idx;
     #define JUMP_TO_ADDR(addr) do { \
-       	void* __addr = addr; \
-       	__asm jmp __addr \
+        _jmpto = addr; \
+       	goto jump_table; \
     } while (0)
 #endif
 

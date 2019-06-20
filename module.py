@@ -1009,7 +1009,7 @@ class Module(ModuleBase):
         elif op in (SETUP_LOOP, SETUP_EXCEPT, SETUP_FINALLY):
             context.begin_block()
             context.insert_line('void* __addr;')
-            context.insert_line('GET_ADDRESS(__addr, label_%d);' % (label + oparg + 2))
+            context.insert_get_address(label + oparg + 2)
             context.insert_line('PyFrame_BlockSetup(f, %d, __addr, STACK_LEVEL());' % op)
             context.end_block()
 
@@ -1055,7 +1055,7 @@ class Module(ModuleBase):
         elif op == CONTINUE_LOOP:
             context.begin_block()
             context.insert_line('void* __addr;')
-            context.insert_line('GET_ADDRESS(__addr, label_%d);' % oparg)
+            context.insert_get_address(oparg)
             context.insert_line('retval = PyLong_FromSsize_t((Py_ssize_t)__addr);')
             context.insert_line('*why = WHY_CONTINUE; goto fast_block_end;')
             context.end_block()
@@ -1123,7 +1123,7 @@ class Module(ModuleBase):
             context.insert_handle_error(line, label)
             context.insert_line('}')
             context.insert_line('void* __addr;')
-            context.insert_line('GET_ADDRESS(__addr, label_%d);' % (label + oparg + 2))
+            context.insert_get_address(label + oparg + 2)
             context.insert_line('PyFrame_BlockSetup(f, SETUP_FINALLY, __addr, STACK_LEVEL());')
             context.insert_line('PUSH(x);')
             context.end_block()

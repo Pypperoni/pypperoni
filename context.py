@@ -33,7 +33,7 @@ class Context:
         self.__indentstr = '  '
 
         self.codeobjs = []
-        self.yield_labels = []
+        self.jump_table = {}
         self._last_label = -2
 
         self.buf = []
@@ -179,18 +179,30 @@ class Context:
             self.file.write('  __%s_load_consts();\n' % self.file.uid)
 
         self.file.write('  *why = WHY_NOT;\n')
+        self.file.write('  goto pre_start;\n')
+
+        # Write jump table
+        self.file.write('  jump_table:\n')
+        self.file.write('  switch ((unsigned int)_jmpto) {\n')
+        for idx, label in self.jump_table.items():
+            self.file.write('    case %d: goto %s; break;\n' % (idx, label))
+        self.file.write('    default: goto start;\n')
+        self.file.write('  }\n')
+
+        # Pre-start: for generators, jump to last instruction
+        self.file.write('  pre_start:\n')
 
         if self.flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR):
             self.file.write('  if (PyErr_Occurred()) goto error; /* generator.throw() */\n')
             self.file.write('  f->f_lineno = 0;')
-            self.file.write('  switch (f->f_lasti) {\n')
-            for l in self.yield_labels:
-                self.file.write('    case %d: goto label_%d; break;\n' % (l, l))
-            self.file.write('    default: break;\n')
-            self.file.write('  }\n')
+            self.file.write('  _jmpto = (void*)f->f_lasti;')
+            self.file.write('  goto jump_table;')
 
         else:
             self.file.write('  assert(!PyErr_Occurred());\n')
+
+        # Actual start of function code
+        self.file.write('  start:\n')
 
         self.codebuffer.seek(0)
         self.file.write(self.codebuffer.read() + '}\n\n')
@@ -215,7 +227,7 @@ class Context:
         self.codebuffer.write('\n')
 
     def insert_yield(self, line, label):
-        self.yield_labels.append(label)
+        self.jump_table[label] = 'label_%d' % label
         self.insert_line('*why = WHY_YIELD;')
         self.insert_line('f->f_lasti = %d;' % label)
         self.insert_line('f->f_lineno = %d; /* in case of throw() */' % line)
@@ -224,6 +236,11 @@ class Context:
     def insert_handle_error(self, line, label):
         self.insert_line('f->f_lineno = %d;' % line)
         self.insert_line('goto error;')
+
+    def insert_get_address(self, idx):
+        label = 'label_%d' % idx
+        self.jump_table[idx] = label
+        self.insert_line('GET_ADDRESS(__addr, %s, %d);' % (label, idx))
 
     def add_decl(self, name, type='PyObject*', val='NULL', deref=True):
         self.__decls.append((name, type, val, deref))
