@@ -48,7 +48,7 @@ class ConditionalFile:
             self.__write()
             return (self.filename, newhash, False)
 
-        f = open(self.filename, 'r')
+        f = open(self.filename, 'rb')
         oldhash = self.hashfunc(f)
         self.seek(0)
         f.close()
@@ -61,8 +61,8 @@ class ConditionalFile:
 
     def __write(self):
         self.seek(0)
-        f = open(self.filename, 'w')
-        f.write(self._buf.read())
+        f = open(self.filename, 'wb')
+        f.write(self._buf.read().encode('utf-8', errors='backslashreplace'))
         f.close()
 
 
