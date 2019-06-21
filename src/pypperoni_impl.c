@@ -1395,7 +1395,7 @@ void setup_pypperoni()
                            PyCFunction_New(&describeException_def, NULL));
 
     PyObject_SetAttrString(pypperonimod, "platform", PyUnicode_FromString(
-#ifdef WIN32
+#ifdef _WIN32
       "windows"
 #elif ANDROID
       "android"
