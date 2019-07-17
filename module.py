@@ -1427,7 +1427,7 @@ class Module(ModuleBase):
             elif instr[IDX_OP] in hasjabs:
                 yield_at = max(yield_at, instr[IDX_OPARG] + 1)
 
-            elif instr[IDX_OP] == LOAD_CONST and codeobj.co_consts[instr[IDX_OPARG]] == -1:
+            elif instr[IDX_OP] == LOAD_CONST:
                 if len(buf) > i + 2 and buf[i + 2][IDX_OP] == IMPORT_NAME:
                     # Skip until next line:
                     import_instr_size = 0
