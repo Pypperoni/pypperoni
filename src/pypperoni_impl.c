@@ -1331,32 +1331,26 @@ static PyObject* describeException(PyObject* self, PyObject* args)
     _Py_IDENTIFIER(__name__);
 
     PyThreadState* tstate = PyThreadState_GET();
-    PyObject* tb = tstate->exc_traceback;
+    PyTracebackObject* tb = (PyTracebackObject*)tstate->exc_traceback;
     PyFrameObject* exc_frame;
-    PyObject* stack[PyTraceBack_LIMIT];
     PyObject* result;
-    int i, depth = 0;
-
-    if (tb == NULL || tb == Py_None)
-        return PyUnicode_FromString("");
-
-    exc_frame = ((PyTracebackObject*)tb)->tb_frame;
-    while (exc_frame != NULL && exc_frame->f_lineno > 0 && depth < PyTraceBack_LIMIT)
-    {
-        PyObject* modname = _PyDict_GetItemId(exc_frame->f_globals,
-                                              &PyId___name__);
-        stack[depth++] = PyUnicode_FromFormat("In \"%U\", instr %d, line %d", modname,
-                                              exc_frame->f_lasti,
-                                              exc_frame->f_lineno);
-        exc_frame = exc_frame->f_back;
-    }
+    int depth = 0;
 
     result = PyUnicode_FromString("");
-    for (i = --depth; i >= 0; i--)
+    if ((PyObject*)tb == Py_None || result == NULL)
+        tb = NULL;
+
+    while (tb != NULL && depth < PyTraceBack_LIMIT)
     {
-        PyObject* formatted = PyUnicode_FromFormat("#%d %U\n", i, stack[i]);
-        Py_DECREF(stack[depth]);
+        exc_frame = tb->tb_frame;
+        PyObject* modname = _PyDict_GetItemId(exc_frame->f_globals,
+                                              &PyId___name__);
+        PyObject* formatted = PyUnicode_FromFormat("#%d In \"%U\", instr %d, line %d\n",
+                                                   depth++, modname,
+                                                   exc_frame->f_lasti,
+                                                   exc_frame->f_lineno);
         PyUnicode_Append(&result, formatted);
+        tb = tb->tb_next;
     }
 
     return result;
