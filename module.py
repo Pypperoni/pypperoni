@@ -164,9 +164,6 @@ class Module(ModuleBase):
                 else:
                     getter = context.register_const(value)
                     context.insert_line('x = %s; /* %s */' % (getter, safeRepr(value)))
-                    context.insert_line('if (x == NULL) {')
-                    context.insert_handle_error(line, label)
-                    context.insert_line('}')
 
                 context.insert_line('Py_INCREF(x);')
                 context.insert_line('PUSH(x);')
