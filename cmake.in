@@ -39,7 +39,15 @@ include_directories(gen)
 include_directories($$python_root$$/Include)
 include_directories($$pypperoni_root$$/src)
 
-link_directories($$python_root$$/build)
+if (UNIX)
+    if (APPLE)
+        link_directories($$python_root$$/build/osx)
+    else()
+        link_directories($$python_root$$/build/linux2)
+    endif()
+else()
+    link_directories($$python_root$$/build/win64)
+endif()
 
 set(_FILES
     $$pypperoni_root$$/src/pypperoni_impl.c
