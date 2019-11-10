@@ -183,7 +183,7 @@ class Context:
 
         # Write jump table
         self.file.write('  jump_table:\n')
-        self.file.write('  switch ((unsigned int)_jmpto) {\n')
+        self.file.write('  switch ((unsigned long long)_jmpto) {\n')
         for idx, label in self.jump_table.items():
             self.file.write('    case %d: goto %s; break;\n' % (idx, label))
         self.file.write('    default: goto start;\n')
@@ -282,7 +282,7 @@ class Context:
         blobptr = '__data_blob_' + self.file.uid
         pageptr = '__consts_' + self.file.uid
 
-        self.file.write('static const char %s[%d] = {\n  ' % (blobptr, blobsize))
+        self.file.write('static const unsigned char %s[%d] = {\n  ' % (blobptr, blobsize))
 
         i = 0
         for c in blob:
