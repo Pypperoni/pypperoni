@@ -153,7 +153,7 @@ class CMakeFileGenerator:
             for x in f.close():
                 # build/gen/blah -> gen/blah
                 x = x[0].replace('\\', '/')
-                x = x.split(os.sep, 1)[-1]
+                x = x.split('/', 1)[-1]
                 self.__files.append(x)
 
     def __worker(self):
