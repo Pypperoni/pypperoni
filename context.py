@@ -58,6 +58,11 @@ class Context:
         self._consts = []
 
     def finish(self, encapsulated):
+        if self.jump_table:
+            max_required_label = max(self.jump_table.keys())
+            if self._last_label < max_required_label:
+                self.insert_label(max_required_label)
+
         self.insert_line('goto end;')
         self.insert_line('error:')
         self.insert_line('  *why = WHY_EXCEPTION;')
