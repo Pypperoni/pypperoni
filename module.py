@@ -50,7 +50,7 @@ class ModuleBase:
     '''
     def __init__(self, name, code):
         self.name = name
-        self.astmod = ast.parse(code)
+        self.astmod = ast.parse(code, name)
 
         self._is_main = False
         self._id = -1
