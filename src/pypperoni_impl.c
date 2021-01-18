@@ -1144,6 +1144,112 @@ raise_error:
     return 0;
 }
 
+PyObject* __pypperoni_IMPL_get_aiter(PyObject* obj)
+{
+    unaryfunc getter = NULL;
+    PyObject *iter = NULL;
+    PyObject *awaitable = NULL;
+    PyTypeObject *type = Py_TYPE(obj);
+
+    if (type->tp_as_async != NULL) {
+        getter = type->tp_as_async->am_aiter;
+    }
+
+    if (getter != NULL) {
+        iter = (*getter)(obj);
+        Py_DECREF(obj);
+        if (iter == NULL) {
+            return NULL;
+        }
+    }
+    else {
+        PyErr_Format(
+            PyExc_TypeError,
+            "'async for' requires an object with "
+            "__aiter__ method, got %.100s",
+            type->tp_name);
+        Py_DECREF(obj);
+        return NULL;
+    }
+
+    if (Py_TYPE(iter)->tp_as_async != NULL &&
+            Py_TYPE(iter)->tp_as_async->am_anext != NULL) {
+        PyObject *wrapper = _PyAIterWrapper_New(iter);
+        Py_DECREF(iter);
+        return wrapper;
+    }
+
+    awaitable = _PyCoro_GetAwaitableIter(iter);
+    if (awaitable == NULL) {
+        _PyErr_FormatFromCause(
+            PyExc_TypeError,
+            "'async for' received an invalid object "
+            "from __aiter__: %.100s",
+            Py_TYPE(iter)->tp_name);
+        Py_DECREF(iter);
+        return NULL;
+    } else {
+        Py_DECREF(iter);
+
+        if (PyErr_WarnFormat(
+                PyExc_DeprecationWarning, 1,
+                "'%.100s' implements legacy __aiter__ protocol; "
+                "__aiter__ should return an asynchronous "
+                "iterator, not awaitable",
+                type->tp_name))
+        {
+            /* Warning was converted to an error. */
+            Py_DECREF(awaitable);
+            return NULL;
+        }
+    }
+
+    return awaitable;
+}
+
+PyObject* __pypperoni_IMPL_get_anext(PyObject* aiter)
+{
+    unaryfunc getter = NULL;
+    PyObject *next_iter = NULL;
+    PyObject *awaitable = NULL;
+    PyTypeObject *type = Py_TYPE(aiter);
+
+    if (PyAsyncGen_CheckExact(aiter)) {
+        awaitable = type->tp_as_async->am_anext(aiter);
+    }
+    else {
+        if (type->tp_as_async != NULL) {
+            getter = type->tp_as_async->am_anext;
+        }
+
+        if (getter == NULL) {
+            awaitable = NULL;
+            PyErr_Format(
+                PyExc_TypeError,
+                "'async for' requires an iterator with "
+                "__anext__ method, got %.100s",
+                type->tp_name);
+        }
+        else {
+            next_iter = (*getter)(aiter);
+            if (next_iter != NULL) {
+                awaitable = _PyCoro_GetAwaitableIter(next_iter);
+                if (awaitable == NULL) {
+                    _PyErr_FormatFromCause(
+                        PyExc_TypeError,
+                        "'async for' received an invalid object "
+                        "from __anext__: %.100s",
+                        Py_TYPE(next_iter)->tp_name);
+                }
+
+                Py_DECREF(next_iter);
+            }
+        }
+    }
+
+    return awaitable;
+}
+
 /* Modules */
 #define MODULE_BUILTIN 1
 #define MODULE_DEFINED 2

@@ -109,6 +109,8 @@ PyObject* __pypperoni_IMPL_call_func(PyObject*** sp, int oparg, PyObject* kwargs
 int __pypperoni_IMPL_load_build_class(PyFrameObject* f, PyObject** result);
 int __pypperoni_IMPL_setup_with(PyObject* v, PyObject** exitptr, PyObject** result);
 int __pypperoni_IMPL_do_raise(PyObject* exc, PyObject* cause);
+PyObject* __pypperoni_IMPL_get_aiter(PyObject* obj);
+PyObject* __pypperoni_IMPL_get_anext(PyObject* obj);
 
 PyObject* __pypperoni_IMPL_import(int64_t index);
 PyObject* __pypperoni_IMPL_import_from(PyObject* mod, const char* name);
