@@ -28,10 +28,6 @@ if (MSVC)
     add_definitions(/wd4102)
 endif()
 
-if (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_C_COMPILER_ID MATCHES "GNU")
-    set(CMAKE_C_FLAGS "-g")
-endif()
-
 add_definitions(-DNDEBUG)
 add_definitions(-DPy_BUILD_CORE)
 
